@@ -27,6 +27,13 @@ contract UniswapV3Pool {
         // Current tick
         int24 tick;
     }
+
+    struct CallbackData {
+        address token0;
+        address token1;
+        address payer;
+    }
+
     Slot0 public slot0;
 
     // Amount of liquidity, L.
@@ -78,6 +85,12 @@ contract UniswapV3Pool {
 
         uint256 balance0Before;
         uint256 balance1Before;
+        CallbackData memory extra = CallbackData({
+            token0: address(token0),
+            token1: address(token1),
+            payer: msg.sender
+        });
+        bytes32 data = abi.encode(extra);
 
         ticks.update(lowerTick, amount);
         ticks.update(upperTick, amount);
@@ -99,7 +112,8 @@ contract UniswapV3Pool {
 
         IUniswapV3MintCallback(msg.sender).uniswapV3MintCallback(
             amount0,
-            amount1
+            amount1,
+            data
         );
 
         if (amount0 > 0 && balance0Before + amount0 > balance0()) {
@@ -136,7 +150,8 @@ contract UniswapV3Pool {
         uint256 balance1Before = balance1();
         IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
             amount0,
-            amount1
+            amount1,
+            data
         );
 
         if (balance1Before + uint256(amount1) > balance1())
