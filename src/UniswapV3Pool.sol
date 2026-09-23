@@ -1,5 +1,7 @@
 pragma solidity ^0.8.14;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "src/lib/Tick.sol";
 import "src/lib/Position.sol";
 
@@ -31,6 +33,20 @@ contract UniswapV3Pool {
     mapping(int24 => Tick.Info) public ticks;
     // Positions info
     mapping(bytes32 => Position.Info) public positions;
+
+    event Mint(
+        address sender,
+        address owner,
+        int24 lowerTick,
+        int24 upperTick,
+        uint128 amount,
+        uint256 amount0,
+        uint256 amount1
+    );
+
+    error InsufficientInputAmount();
+    error InvalidTickRange();
+    error ZeroLiquidity();
 
     constructor(
         address _token0,
@@ -98,6 +114,29 @@ contract UniswapV3Pool {
             amount0,
             amount1
         );
+    }
+
+    function swap(
+        address recipient
+    ) public returns (int256 amount0, int256 amount1) {
+        int24 nextTick = 85184;
+        uint160 nextPrice = 5604469350942327889444743441197;
+
+        amount0 = -0.008396714242162444 ether;
+        amount1 = 42 ether;
+
+        (slot0.tick, slot0.sqrtPriceX96) = (nextTick, nextPrice);
+
+        IERC20(token0).transfer(recipient, uint256(-amount0));
+
+        uint256 balance1Before = balance1();
+        IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
+            amount0,
+            amount1
+        );
+
+        if (balance1Before + uint256(amount1) < balance1())
+            revert InsufficientInputAmount();
     }
 
     function balance0() internal returns (uint256 balance) {
