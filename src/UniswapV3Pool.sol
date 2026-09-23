@@ -89,12 +89,13 @@ contract UniswapV3Pool {
         );
 
         position.update(amount);
+        liquidity += amount;
 
         amount0 = 0.998976618347425280 ether;
         amount1 = 5000 ether;
 
         if (amount0 > 0) balance0Before = balance0();
-        if (amount1 > 1) balance1Before = balance1();
+        if (amount1 > 0) balance1Before = balance1();
 
         IUniswapV3MintCallback(msg.sender).uniswapV3MintCallback(
             amount0,
@@ -138,7 +139,7 @@ contract UniswapV3Pool {
             amount1
         );
 
-        if (balance1Before + uint256(amount1) < balance1())
+        if (balance1Before + uint256(amount1) > balance1())
             revert InsufficientInputAmount();
     }
 
@@ -147,6 +148,6 @@ contract UniswapV3Pool {
     }
 
     function balance1() internal view returns (uint256 balance) {
-        balance = IERC20(token0).balanceOf(address(this));
+        balance = IERC20(token1).balanceOf(address(this));
     }
 }
