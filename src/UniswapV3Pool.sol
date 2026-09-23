@@ -2,6 +2,9 @@ pragma solidity ^0.8.14;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IUniswapV3SwapCallback} from "./interfaces/IUniswapV3SwapCallback.sol";
+import {IUniswapV3MintCallback} from "./interfaces/IUniswapV3MintCallback.sol";
+
 import "src/lib/Tick.sol";
 import "src/lib/Position.sol";
 
@@ -139,27 +142,11 @@ contract UniswapV3Pool {
             revert InsufficientInputAmount();
     }
 
-    function balance0() internal returns (uint256 balance) {
+    function balance0() internal view returns (uint256 balance) {
         balance = IERC20(token0).balanceOf(address(this));
     }
 
-    function balance1() internal returns (uint256 balance) {
+    function balance1() internal view returns (uint256 balance) {
         balance = IERC20(token0).balanceOf(address(this));
-    }
-
-    function update(
-        mapping(int24 => Tick.Info) storage self,
-        int24 tick,
-        uint128 liquidityDelta
-    ) internal {
-        Tick.Info storage tickInfo = self[tick];
-        uint128 liquidityBefore = tickInfo.liquidity;
-        uint128 liquidityAfter = liquidityBefore + liquidityDelta;
-
-        if (liquidityBefore == 0) {
-            tickInfo.initialized = true;
-        }
-
-        tickInfo.liquidity = liquidityAfter;
     }
 }
