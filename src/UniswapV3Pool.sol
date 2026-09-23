@@ -74,7 +74,8 @@ contract UniswapV3Pool {
         address owner,
         int24 lowerTick,
         int24 upperTick,
-        uint128 amount
+        uint128 amount,
+        bytes calldata data
     ) external returns (uint256 amount0, uint256 amount1) {
         if (
             lowerTick >= upperTick ||
@@ -85,12 +86,6 @@ contract UniswapV3Pool {
 
         uint256 balance0Before;
         uint256 balance1Before;
-        CallbackData memory extra = CallbackData({
-            token0: address(token0),
-            token1: address(token1),
-            payer: msg.sender
-        });
-        bytes32 data = abi.encode(extra);
 
         ticks.update(lowerTick, amount);
         ticks.update(upperTick, amount);
@@ -135,7 +130,8 @@ contract UniswapV3Pool {
     }
 
     function swap(
-        address recipient
+        address recipient,
+        bytes calldata data
     ) public returns (int256 amount0, int256 amount1) {
         int24 nextTick = 85184;
         uint160 nextPrice = 5604469350942327889444743441197;

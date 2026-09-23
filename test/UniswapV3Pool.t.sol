@@ -34,6 +34,33 @@ contract UniswapV3PoolTest is Test, TestUtils {
         token1 = new ERC20Mintable("USDC", "USDC", 18);
     }
 
+    function setupTestCase(
+        TestCaseParams memory params
+    ) internal returns (uint256 poolBalance0, uint256 poolBalance1) {
+        token0.mint(address(this), params.wethBalance);
+        token1.mint(address(this), params.usdcBalance);
+
+        pool = new UniswapV3Pool(
+            address(token0),
+            address(token1),
+            params.currentSqrtP,
+            params.currentTick
+        );
+
+        transferInMintCallback = params.transferInMintCallback;
+        transferInSwapCallback = params.transferInSwapCallback;
+
+        if (params.mintLiqudity) {
+            (poolBalance0, poolBalance1) = pool.mint(
+                address(this),
+                params.lowerTick,
+                params.upperTick,
+                params.liquidity,
+                ""
+            );
+        }
+    }
+
     function testMintSuccess() public {
         TestCaseParams memory params = TestCaseParams({
             wethBalance: 1 ether,
@@ -113,10 +140,21 @@ contract UniswapV3PoolTest is Test, TestUtils {
         });
         (uint256 poolBalance0, uint256 poolBalance1) = setupTestCase(params);
 
-        token1.mint(address(this), 42 ether);
+        uint256 swapAmount = 42 ether;
+        token1.mint(address(this), swapAmount);
+        token1.approve(address(this), swapAmount);
+        UniswapV3Pool.CallbackData memory extra = UniswapV3Pool.CallbackData({
+            token0: address(token0),
+            token1: address(token1),
+            payer: address(this)
+        });
+
         int256 userBalance0Before = int256(token0.balanceOf(address(this)));
 
-        (int256 amount0Delta, int256 amount1Delta) = pool.swap(address(this));
+        (int256 amount0Delta, int256 amount1Delta) = pool.swap(
+            address(this),
+            abi.encode(extra)
+        );
 
         assertEq(amount0Delta, -0.008396714242162444 ether, "invalid ETH out");
         assertEq(amount1Delta, 42 ether, "invalid USDC in");
@@ -175,34 +213,10 @@ contract UniswapV3PoolTest is Test, TestUtils {
         setupTestCase(params);
 
         vm.expectRevert(encodeError("InsufficientInputAmount()"));
-        pool.swap(address(this));
+        pool.swap(address(this), "");
     }
 
-    function setupTestCase(
-        TestCaseParams memory params
-    ) internal returns (uint256 poolBalance0, uint256 poolBalance1) {
-        token0.mint(address(this), params.wethBalance);
-        token1.mint(address(this), params.usdcBalance);
-
-        pool = new UniswapV3Pool(
-            address(token0),
-            address(token1),
-            params.currentSqrtP,
-            params.currentTick
-        );
-
-        transferInMintCallback = params.transferInMintCallback;
-        transferInSwapCallback = params.transferInSwapCallback;
-
-        if (params.mintLiqudity) {
-            (poolBalance0, poolBalance1) = pool.mint(
-                address(this),
-                params.lowerTick,
-                params.upperTick,
-                params.liquidity
-            );
-        }
-    }
+    // CALLBACKS
 
     function uniswapV3MintCallback(
         uint256 amount0,
