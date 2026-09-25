@@ -12,6 +12,8 @@ contract UniswapV3Pool {
     using Tick for mapping(int24 => Tick.Info);
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
+    using TickBitmap for mapping(int16 => uint256);
+    mapping(int16 => uint256) public tickBitmap;
 
     int24 internal constant MIN_TICK = -887272;
     int24 internal constant MAX_TICK = -MIN_TICK;
@@ -152,6 +154,46 @@ contract UniswapV3Pool {
 
         if (balance1Before + uint256(amount1) > balance1())
             revert InsufficientInputAmount();
+    }
+
+    function nextInitializedTickWithinOneWord(
+        mapping(int16 => uint256) storage self,
+        int24 tick,
+        int24 tickSpacing,
+        bool lte
+    ) internal view returns (int24 next, bool initialized) {
+        int24 compressed = tick / tickSpacing;
+
+        if (lte) {
+            (int16 wordPos, uint8 bitPos) = position(compressed);
+            uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
+            uint256 masked = self[wordPos] & mask;
+            initialized = masked != 0;
+            next = initialized
+                ? (compressed -
+                    int24(
+                        uint24(bitPos - BitMath.mostSignificantBit(masked))
+                    )) * tickSpacing
+                : (compressed - int24(uint24(bitPos))) * tickSpacing;
+        }
+    }
+
+    function flipTick(
+        mapping(int16 => uint256) storage self,
+        int24 tick,
+        int24 tickSpacing
+    ) internal {
+        require(tick % tickSpacing == 0); // ensure that the tick is spaced
+        (int16 wordPos, uint8 bitPos) = position(tick / tickSpacing);
+        uint256 mask = 1 << bitPos; // 1 * bitPos.. 10000
+        self[wordPos] ^= mask; //
+    }
+
+    function position(
+        int24 tick
+    ) private pure returns (int16 wordPos, uint8 bitPos) {
+        wordPos = int16(tick >> 8);
+        bitPos = uint8(uint24(tick % 256));
     }
 
     function balance0() internal view returns (uint256 balance) {
