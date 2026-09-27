@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.14;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -7,6 +8,7 @@ import {IUniswapV3MintCallback} from "./interfaces/IUniswapV3MintCallback.sol";
 
 import "src/lib/Tick.sol";
 import "src/lib/Position.sol";
+import "src/lib/TickBitmap.sol";
 
 contract UniswapV3Pool {
     using Tick for mapping(int24 => Tick.Info);
@@ -89,8 +91,15 @@ contract UniswapV3Pool {
         uint256 balance0Before;
         uint256 balance1Before;
 
-        ticks.update(lowerTick, amount);
-        ticks.update(upperTick, amount);
+        bool flippedLower = ticks.update(lowerTick, amount);
+        bool flippedUpper = ticks.update(upperTick, amount);
+
+        if (flippedLower) {
+            tickBitmap.flipTick(lowerTick, 1);
+        }
+        if (flippedUpper) {
+            tickBitmap.flipTick(upperTick, 1);
+        }
 
         Position.Info storage position = positions.get(
             owner,
@@ -101,8 +110,17 @@ contract UniswapV3Pool {
         position.update(amount);
         liquidity += amount;
 
-        amount0 = 0.998976618347425280 ether;
-        amount1 = 5000 ether;
+        amount0 = Math.calcAmount0Delta(
+            slot0_.sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(upperTick),
+            amount
+        );
+
+        amount1 = Math.calcAmount1Delta(
+            slot0_.sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(lowerTick),
+            amount
+        );
 
         if (amount0 > 0) balance0Before = balance0();
         if (amount1 > 0) balance1Before = balance1();
@@ -154,46 +172,6 @@ contract UniswapV3Pool {
 
         if (balance1Before + uint256(amount1) > balance1())
             revert InsufficientInputAmount();
-    }
-
-    function nextInitializedTickWithinOneWord(
-        mapping(int16 => uint256) storage self,
-        int24 tick,
-        int24 tickSpacing,
-        bool lte
-    ) internal view returns (int24 next, bool initialized) {
-        int24 compressed = tick / tickSpacing;
-
-        if (lte) {
-            (int16 wordPos, uint8 bitPos) = position(compressed);
-            uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
-            uint256 masked = self[wordPos] & mask;
-            initialized = masked != 0;
-            next = initialized
-                ? (compressed -
-                    int24(
-                        uint24(bitPos - BitMath.mostSignificantBit(masked))
-                    )) * tickSpacing
-                : (compressed - int24(uint24(bitPos))) * tickSpacing;
-        }
-    }
-
-    function flipTick(
-        mapping(int16 => uint256) storage self,
-        int24 tick,
-        int24 tickSpacing
-    ) internal {
-        require(tick % tickSpacing == 0); // ensure that the tick is spaced
-        (int16 wordPos, uint8 bitPos) = position(tick / tickSpacing);
-        uint256 mask = 1 << bitPos; // 1 * bitPos.. 10000
-        self[wordPos] ^= mask; //
-    }
-
-    function position(
-        int24 tick
-    ) private pure returns (int16 wordPos, uint8 bitPos) {
-        wordPos = int16(tick >> 8);
-        bitPos = uint8(uint24(tick % 256));
     }
 
     function balance0() internal view returns (uint256 balance) {

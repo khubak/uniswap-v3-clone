@@ -1,11 +1,20 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.14;
+
 library Position {
     struct Info {
         uint128 liquidity;
     }
 
-    function update(Info storage self, uint128 liquidityDelta) internal {
+    function update(
+        Info storage self,
+        int24 tick,
+        uint128 liquidityDelta
+    ) internal returns (bool flipped) {
         uint128 liquidityBefore = self.liquidity;
         uint128 liquidityAfter = liquidityBefore + liquidityDelta;
+
+        flipped = (liquidityAfter == 0) != (liquidityBefore == 0);
 
         self.liquidity = liquidityAfter;
     }

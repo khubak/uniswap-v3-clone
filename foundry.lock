@@ -13,5 +13,11 @@
   },
   "lib/solmate": {
     "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+  },
+  "lib/v3-core": {
+    "tag": {
+      "name": "v1.0.0",
+      "rev": "e3589b192d0be27e100cd0daaf6c97204fdb1899"
+    }
   }
 }
