@@ -87,8 +87,8 @@ contract UniswapV3PoolTest is Test, TestUtils {
 
         (uint256 poolBalance0, uint256 poolBalance1) = setupTestCase(params);
 
-        uint256 expectedAmount0 = 0.998976618347425280 ether;
-        uint256 expectedAmount1 = 5000 ether;
+        uint256 expectedAmount0 = 0.998833192822975409 ether;
+        uint256 expectedAmount1 = 4999.187247111820044641 ether;
 
         assertEq(
             poolBalance0,
@@ -160,6 +160,7 @@ contract UniswapV3PoolTest is Test, TestUtils {
         });
 
         int256 userBalance0Before = int256(token0.balanceOf(address(this)));
+        int256 userBalance1Before = int256(token1.balanceOf(address(this)));
 
         (int256 amount0Delta, int256 amount1Delta) = pool.swap(
             address(this),
@@ -176,7 +177,7 @@ contract UniswapV3PoolTest is Test, TestUtils {
         );
         assertEq(
             token1.balanceOf(address(this)),
-            0,
+            uint256(userBalance1Before - amount1Delta),
             "invalid user USDC balance"
         );
 

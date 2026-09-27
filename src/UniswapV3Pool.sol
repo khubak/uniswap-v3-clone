@@ -2,6 +2,7 @@
 pragma solidity ^0.8.14;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TickMath} from "src/lib/TickMath.sol";
 
 import {IUniswapV3SwapCallback} from "./interfaces/IUniswapV3SwapCallback.sol";
 import {IUniswapV3MintCallback} from "./interfaces/IUniswapV3MintCallback.sol";
@@ -9,13 +10,13 @@ import {IUniswapV3MintCallback} from "./interfaces/IUniswapV3MintCallback.sol";
 import "src/lib/Tick.sol";
 import "src/lib/Position.sol";
 import "src/lib/TickBitmap.sol";
+import "src/lib/Math.sol";
 
 contract UniswapV3Pool {
     using Tick for mapping(int24 => Tick.Info);
+    using TickBitmap for mapping(int16 => uint256);
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
-    using TickBitmap for mapping(int16 => uint256);
-    mapping(int16 => uint256) public tickBitmap;
 
     int24 internal constant MIN_TICK = -887272;
     int24 internal constant MAX_TICK = -MIN_TICK;
@@ -43,9 +44,8 @@ contract UniswapV3Pool {
     // Amount of liquidity, L.
     uint128 public liquidity;
 
-    // Ticks info
     mapping(int24 => Tick.Info) public ticks;
-    // Positions info
+    mapping(int16 => uint256) public tickBitmap;
     mapping(bytes32 => Position.Info) public positions;
 
     event Mint(
@@ -90,6 +90,7 @@ contract UniswapV3Pool {
 
         uint256 balance0Before;
         uint256 balance1Before;
+        Slot0 memory slot0_ = slot0;
 
         bool flippedLower = ticks.update(lowerTick, amount);
         bool flippedUpper = ticks.update(upperTick, amount);
@@ -111,13 +112,13 @@ contract UniswapV3Pool {
         liquidity += amount;
 
         amount0 = Math.calcAmount0Delta(
-            slot0_.sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(slot0_.tick),
             TickMath.getSqrtRatioAtTick(upperTick),
             amount
         );
 
         amount1 = Math.calcAmount1Delta(
-            slot0_.sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(slot0_.tick),
             TickMath.getSqrtRatioAtTick(lowerTick),
             amount
         );
