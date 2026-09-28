@@ -66,12 +66,22 @@ contract UniswapV3Pool {
 
     event Mint(
         address sender,
-        address owner,
-        int24 lowerTick,
-        int24 upperTick,
+        address indexed owner,
+        int24 indexed tickLower,
+        int24 indexed tickUpper,
         uint128 amount,
         uint256 amount0,
         uint256 amount1
+    );
+
+    event Swap(
+        address indexed sender,
+        address indexed recipient,
+        int256 amount0,
+        int256 amount1,
+        uint160 sqrtPriceX96,
+        uint128 liquidity,
+        int24 tick
     );
 
     error InsufficientInputAmount();
@@ -168,6 +178,8 @@ contract UniswapV3Pool {
 
     function swap(
         address recipient,
+        bool zeroForOne,
+        uint256 amountSpecified,
         bytes calldata data
     ) public returns (int256 amount0, int256 amount1) {
         Slot0 memory slot0_ = slot0;
@@ -203,48 +215,55 @@ contract UniswapV3Pool {
             state.amountSpecifiedRemaining -= step.amountIn;
             state.amountCalculated += step.amountOut;
             state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
-
-            if (state.tick != slot0_.tick) {
-                (slot0.sqrtPriceX96, slot0.tick) = (
-                    state.sqrtPriceX96,
-                    state.tick
-                );
-            }
-
-            (amount0, amount1) = zeroForOne
-                ? (
-                    int256(amountSpecified - state.amountSpecifiedRemaining),
-                    -int256(state.amountCalculated)
-                )
-                : (
-                    -int256(state.amountCalculated),
-                    int256(amountSpecified - state.amountSpecifiedRemaining)
-                );
-
-            if (zeroForOne) {
-                IERC20(token1).transfer(recipient, uint256(-amount1));
-
-                uint256 balance0Before = balance0();
-                IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
-                    amount0,
-                    amount1,
-                    data
-                );
-                if (balance0Before + uint256(amount0) > balance0())
-                    revert InsufficientInputAmount();
-            } else {
-                IERC20(token0).transfer(recipient, uint256(-amount0));
-
-                uint256 balance1Before = balance1();
-                IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
-                    amount0,
-                    amount1,
-                    data
-                );
-                if (balance1Before + uint256(amount1) > balance1())
-                    revert InsufficientInputAmount();
-            }
         }
+
+        if (state.tick != slot0_.tick) {
+            (slot0.sqrtPriceX96, slot0.tick) = (state.sqrtPriceX96, state.tick);
+        }
+
+        (amount0, amount1) = zeroForOne
+            ? (
+                int256(amountSpecified - state.amountSpecifiedRemaining),
+                -int256(state.amountCalculated)
+            )
+            : (
+                -int256(state.amountCalculated),
+                int256(amountSpecified - state.amountSpecifiedRemaining)
+            );
+
+        if (zeroForOne) {
+            IERC20(token1).transfer(recipient, uint256(-amount1));
+
+            uint256 balance0Before = balance0();
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
+                amount0,
+                amount1,
+                data
+            );
+            if (balance0Before + uint256(amount0) > balance0())
+                revert InsufficientInputAmount();
+        } else {
+            IERC20(token0).transfer(recipient, uint256(-amount0));
+
+            uint256 balance1Before = balance1();
+            IUniswapV3SwapCallback(msg.sender).uniswapV3SwapCallback(
+                amount0,
+                amount1,
+                data
+            );
+            if (balance1Before + uint256(amount1) > balance1())
+                revert InsufficientInputAmount();
+        }
+
+        emit Swap(
+            msg.sender,
+            recipient,
+            amount0,
+            amount1,
+            slot0.sqrtPriceX96,
+            liquidity,
+            slot0.tick
+        );
     }
 
     function balance0() internal view returns (uint256 balance) {

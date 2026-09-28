@@ -6,13 +6,13 @@ import "../src/UniswapV3Pool.sol";
 
 contract UniswapV3Manager {
     function mint(
-        address poolAddress_,
+        address poolAddress,
         int24 lowerTick,
         int24 upperTick,
         uint128 liquidity,
         bytes calldata data
     ) public {
-        UniswapV3Pool(poolAddress_).mint(
+        UniswapV3Pool(poolAddress).mint(
             msg.sender,
             lowerTick,
             upperTick,
@@ -21,8 +21,18 @@ contract UniswapV3Manager {
         );
     }
 
-    function swap(address poolAddress_, bytes calldata data) public {
-        UniswapV3Pool(poolAddress_).swap(msg.sender, data);
+    function swap(
+        address poolAddress,
+        bool zeroForOne,
+        uint256 amountSpecified,
+        bytes calldata data
+    ) public {
+        UniswapV3Pool(poolAddress).swap(
+            msg.sender,
+            zeroForOne,
+            amountSpecified,
+            data
+        );
     }
 
     function uniswapV3MintCallback(

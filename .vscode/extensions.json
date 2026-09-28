@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "JuanBlanco.solidity"
+  ],
+  "unwantedRecommendations": [
+    "everscale.solidity-support"
+  ]
+}

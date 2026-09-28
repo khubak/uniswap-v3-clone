@@ -66,7 +66,7 @@ print(f"Deposit: {amount_eth/eth} ETH, {amount_usdc/eth} USDC; liquidity: {liq}"
 # Swap USDC for ETH
 amount_in = 42 * eth
 
-print(f"Selling {amount_in/eth} USDC")
+print(f"\nSelling {amount_in/eth} USDC")
 
 price_diff = (amount_in * q96) // liq
 price_next = sqrtp_cur + price_diff
