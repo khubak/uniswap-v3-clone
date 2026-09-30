@@ -5,20 +5,53 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../src/UniswapV3Pool.sol";
 
 contract UniswapV3Manager {
+    struct MintParams {
+        address poolAddress;
+        int24 lowerTick;
+        int24 upperTick;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+    }
+
     function mint(
-        address poolAddress,
-        int24 lowerTick,
-        int24 upperTick,
-        uint128 liquidity,
-        bytes calldata data
-    ) public {
-        UniswapV3Pool(poolAddress).mint(
-            msg.sender,
-            lowerTick,
-            upperTick,
-            liquidity,
-            data
+        MintParams calldata params
+    ) public returns (uint256 amount0, uint256 amount1) {
+        IUniswapV3Pool pool = IUniswapV3Pool(params.poolAddress);
+
+        (uint160 sqrtPriceX96, ) = pool.slot0();
+        uint160 sqrtPriceLowerX96 = TickMath.getSqrtRatioAtTick(
+            params.lowerTick
         );
+        uint160 sqrtPriceUpperX96 = TickMath.getSqrtRatioAtTick(
+            params.upperTick
+        );
+
+        uint128 liquidity = LiquidityMath.getLiquidityForAmounts(
+            sqrtPriceX96,
+            sqrtPriceLowerX96,
+            sqrtPriceUpperX96,
+            params.amount0Desired,
+            params.amount1Desired
+        );
+
+        (amount0, amount1) = pool.mint(
+            msg.sender,
+            params.lowerTick,
+            params.upperTick,
+            liquidity,
+            abi.encode(
+                IUniswapV3Pool.CallbackData({
+                    token0: pool.token0(),
+                    token1: pool.token1(),
+                    payer: msg.sender
+                })
+            )
+        );
+
+        if (amount0 < params.amount0Min || amount1 < params.amount1Min)
+            revert SlippageCheckFailed(amount0, amount1);
     }
 
     function swap(

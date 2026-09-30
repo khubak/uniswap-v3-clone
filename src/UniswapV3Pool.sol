@@ -199,10 +199,19 @@ contract UniswapV3Pool {
         address recipient,
         bool zeroForOne,
         uint256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
         bytes calldata data
     ) public returns (int256 amount0, int256 amount1) {
         Slot0 memory slot0_ = slot0;
         uint128 liquidity_ = liquidity;
+
+        if (
+            zeroForOne
+                ? sqrtPriceLimitX96 > slot0_.sqrtPriceX96 ||
+                    sqrtPriceLimitX96 < TickMath.MIN_SQRT_RATIO
+                : sqrtPriceLimitX96 < slot0_.sqrtPriceX96 &&
+                    sqrtPriceLimitX96 > TickMath.MAX_SQRT_RATIO
+        ) revert InvalidPriceLimit();
 
         SwapState memory state = SwapState({
             amountSpecifiedRemaining: amountSpecified,
@@ -212,7 +221,10 @@ contract UniswapV3Pool {
             liquidity: liquidity_
         });
 
-        while (state.amountSpecifiedRemaining > 0) {
+        while (
+            state.amountSpecifiedRemaining > 0 &&
+            state.sqrtPriceX96 != sqrtPriceLimitX96
+        ) {
             StepState memory step;
 
             step.sqrtPriceStartX96 = state.sqrtPriceX96;
@@ -225,8 +237,14 @@ contract UniswapV3Pool {
             (state.sqrtPriceX96, step.amountIn, step.amountOut) = SwapMath
                 .computeSwapStep(
                     state.sqrtPriceX96,
-                    step.sqrtPriceNextX96,
-                    liquidity,
+                    (
+                        zeroForOne
+                            ? step.sqrtPriceNextX96 < sqrtPriceLimitX96
+                            : step.sqrtPriceNextX96 > sqrtPriceLimitX96
+                    )
+                        ? sqrtPriceLimitX96
+                        : step.sqrtPriceNextX96,
+                    state.liquidity,
                     state.amountSpecifiedRemaining
                 );
 
@@ -302,6 +320,25 @@ contract UniswapV3Pool {
             liquidity,
             slot0.tick
         );
+    }
+
+    function flash(
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata data
+    ) public {
+        uint256 balance0Before = IERC20(token0).balanceOf(address(this));
+        uint256 balance1Before = IERC20(token1).balanceOf(address(this));
+
+        if (amount0 > 0) IERC20(token0).transfer(msg.sender, amount0);
+        if (amount1 > 0) IERC20(token1).transfer(msg.sender, amount1);
+
+        IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(data);
+
+        require(IERC20(token0).balanceOf(address(this)) >= balance0Before);
+        require(IERC20(token1).balanceOf(address(this)) >= balance1Before);
+
+        emit Flash(msg.sender, amount0, amount1);
     }
 
     function balance0() internal view returns (uint256 balance) {
