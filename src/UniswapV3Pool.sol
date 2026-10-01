@@ -5,6 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IUniswapV3SwapCallback} from "./interfaces/IUniswapV3SwapCallback.sol";
 import {IUniswapV3MintCallback} from "./interfaces/IUniswapV3MintCallback.sol";
+import {
+    IUniswapV3FlashCallback
+} from "./interfaces/IUniswapV3FlashCallback.sol";
 
 import "src/lib/Math.sol";
 import "src/lib/Tick.sol";
@@ -87,10 +90,14 @@ contract UniswapV3Pool {
         int24 tick
     );
 
+    event Flash(address indexed recipient, uint256 amount0, uint256 amount1);
+
     error InsufficientInputAmount();
     error InvalidTickRange();
     error ZeroLiquidity();
     error NotEnoughLiquidity();
+    error InvalidPriceLimit();
+    error AlreadyInitialized();
 
     constructor(
         address _token0,
@@ -98,8 +105,20 @@ contract UniswapV3Pool {
         uint160 sqrtPriceX96,
         int24 tick
     ) {
+        (factory, token0, token1, tickSpacing) = IUniswapV3PoolDeployer(
+            msg.sender
+        ).parameters();
+
         token0 = _token0;
         token1 = _token1;
+
+        slot0 = Slot0({sqrtPriceX96: sqrtPriceX96, tick: tick});
+    }
+
+    function initialize(uint160 sqrtPriceX96) public {
+        if (slot0.sqrtPriceX96 != 0) revert AlreadyInitialized();
+
+        int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
 
         slot0 = Slot0({sqrtPriceX96: sqrtPriceX96, tick: tick});
     }

@@ -2,18 +2,15 @@
 pragma solidity ^0.8.14;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../src/UniswapV3Pool.sol";
 
-contract UniswapV3Manager {
-    struct MintParams {
-        address poolAddress;
-        int24 lowerTick;
-        int24 upperTick;
-        uint256 amount0Desired;
-        uint256 amount1Desired;
-        uint256 amount0Min;
-        uint256 amount1Min;
-    }
+import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3Manager} from "./interfaces/IUniswapV3Manager.sol";
+
+import "./lib/LiquidityMath.sol";
+import "./lib/TickMath.sol";
+
+contract UniswapV3Manager is IUniswapV3Manager {
+    error SlippageCheckFailed(uint256 amount0, uint256 amount1);
 
     function mint(
         MintParams calldata params
@@ -60,7 +57,7 @@ contract UniswapV3Manager {
         uint256 amountSpecified,
         bytes calldata data
     ) public {
-        UniswapV3Pool(poolAddress).swap(
+        IUniswapV3Pool(poolAddress).swap(
             msg.sender,
             zeroForOne,
             amountSpecified,
@@ -73,9 +70,9 @@ contract UniswapV3Manager {
         uint256 amount1,
         bytes calldata data
     ) public {
-        UniswapV3Pool.CallbackData memory extra = abi.decode(
+        IUniswapV3Pool.CallbackData memory extra = abi.decode(
             data,
-            (UniswapV3Pool.CallbackData)
+            (IUniswapV3Pool.CallbackData)
         );
 
         IERC20(extra.token0).transferFrom(extra.payer, msg.sender, amount0);
